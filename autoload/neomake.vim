@@ -967,9 +967,13 @@ function! s:clean_make_info(make_id) abort
             call delete(tempfile)
         endfor
 
-        for dir in get(s:make_info[a:make_id], 'created_dirs')
-            call delete(dir, 'd')
-        endfor
+        " Only delete the dir, if Vim supports it.  It will be cleaned up
+        " when quitting Vim in any case.
+        if v:version >= 705 || (v:version == 704 && has('patch1107'))
+            for dir in get(s:make_info[a:make_id], 'created_dirs')
+                call delete(dir, 'd')
+            endfor
+        endif
     endif
 
     unlet s:make_info[a:make_id]
