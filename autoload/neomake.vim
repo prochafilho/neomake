@@ -1036,7 +1036,7 @@ function! s:ProcessEntries(jobinfo, entries, ...) abort
     else
         " Fix entries with get_list_entries/process_output.
         call map(a:entries, 'extend(v:val, {'
-                    \ . "'bufnr': str2nr(get(v:val, 'bufnr', a:jobinfo.bufnr)),"
+                    \ . "'bufnr': str2nr(get(v:val, 'bufnr', 0)),"
                     \ . "'lnum': str2nr(v:val.lnum),"
                     \ . "'col': str2nr(get(v:val, 'col', 0)),"
                     \ . "'vcol': str2nr(get(v:val, 'vcol', 0)),"
@@ -1048,9 +1048,21 @@ function! s:ProcessEntries(jobinfo, entries, ...) abort
         let prev_list = file_mode ? getloclist(0) : getqflist()
         if file_mode
             call setloclist(0, a:entries, 'a')
+            let parsed_entries = getloclist(0)[len(prev_list):]
         else
             call setqflist(a:entries, 'a')
+            let parsed_entries = getqflist()[len(prev_list):]
         endif
+        let idx = 0
+        for e in parsed_entries
+            if a:entries[idx].bufnr != e.bufnr
+                call neomake#utils#DebugMessage(printf(
+                            \ 'Updating entry bufnr: %s => %s',
+                            \ a:entries[idx].bufnr, e.bufnr))
+                let a:entries[idx].bufnr = e.bufnr
+            endif
+            let idx += 1
+        endfor
     endif
 
     let counts_changed = 0
@@ -1059,6 +1071,7 @@ function! s:ProcessEntries(jobinfo, entries, ...) abort
     let do_highlight = get(g:, 'neomake_highlight_columns', 1)
                 \ || get(g:, 'neomake_highlight_lines', 0)
     let signs_by_bufnr = {}
+    let skipped_without_bufnr = 0
     for entry in a:entries
         if !file_mode
             if neomake#statusline#AddQflistCount(entry)
@@ -1067,6 +1080,7 @@ function! s:ProcessEntries(jobinfo, entries, ...) abort
         endif
 
         if !entry.bufnr
+            let skipped_without_bufnr += 1
             continue
         endif
 
@@ -1103,8 +1117,13 @@ function! s:ProcessEntries(jobinfo, entries, ...) abort
 
     if !empty(ignored_signs)
         call neomake#utils#DebugMessage(printf(
-                    \ 'Could not place signs for %d entries without line number: %s.',
+                    \ 'Could not place signs for %d entries without line number: %s',
                     \ len(ignored_signs), string(ignored_signs)))
+    endif
+
+    if !empty(skipped_without_bufnr)
+        call neomake#utils#DebugMessage(printf('Skipped %d entries without bufnr',
+                    \ skipped_without_bufnr), a:jobinfo)
     endif
 
     if !counts_changed
