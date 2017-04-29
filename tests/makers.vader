@@ -320,9 +320,9 @@ Execute (Makers: get_list_entries via config):
   " filename is removed
   let expected = map(expected, "filter(v:val, 'v:key != \"filename\"')")
   " Unlisted buffer gets added for filename.
-  let new_bufnr = bufnr('unloaded_filename_without_bufnr')
-  Assert !empty(new_bufnr), 'new_bufnr is not empty'
-  let expected[0].bufnr = new_bufnr
+  let unlisted_bufnr = bufnr('unloaded_filename_without_bufnr')
+  Assert !empty(unlisted_bufnr), 'unlisted_bufnr is not empty'
+  let expected[0].bufnr = unlisted_bufnr
 
   AssertEqual getloclist(0), expected
 
@@ -362,9 +362,9 @@ Execute (get_list_entries: minimal example (from doc)):
   let llist = getloclist(0)
 
   " Check that unlisted buffer was created for filename.
-  let new_bufnr = bufnr('/path/to/file')
-  Assert !empty(new_bufnr), 'Unlisted buffer was created (1)'
-  Assert !buflisted(new_bufnr), 'Unlisted buffer was created (2)'
+  let unlisted_bufnr = bufnr('/path/to/file')
+  Assert !empty(unlisted_bufnr), 'Unlisted buffer was created (1)'
+  Assert !buflisted(unlisted_bufnr), 'Unlisted buffer was created (2)'
 
   " Check that existing buffer was used for filename.
   AssertEqual llist[4].bufnr, buf1, 'get_list_entries_buf1 was picked up'
@@ -376,16 +376,117 @@ Execute (get_list_entries: minimal example (from doc)):
   \  'type': 'W', 'pattern': '', 'text': 'Some warning without bufnr'},
   \ {'lnum': 2, 'bufnr': buf1, 'col': 1, 'valid': 1, 'vcol': 0, 'nr': -1,
   \  'type': 'W', 'pattern': '', 'text': 'Some warning'},
-  \ {'lnum': 3, 'bufnr': new_bufnr, 'col': 1, 'valid': 1, 'vcol': 0, 'nr': -1,
+  \ {'lnum': 3, 'bufnr': unlisted_bufnr, 'col': 1, 'valid': 1, 'vcol': 0, 'nr': -1,
   \  'type': 'I', 'pattern': '', 'text': 'Some info'},
   \ {'lnum': 4, 'bufnr': buf1, 'col': 1, 'valid': 1, 'vcol': 0, 'nr': -1,
   \  'type': '', 'pattern': '', 'text': 'Some non-type'} ]
   bwipe
   bwipe
+  exe 'bwipe '.unlisted_bufnr
 
   AssertEqual len(g:neomake_test_countschanged), 1
   AssertEqual len(g:neomake_test_finished), 1
   AssertEqual len(g:neomake_test_jobfinished), 1
+
+Execute (get_list_entries: filename with cwd (non-existing file)):
+  let tempdir = tempname()
+  let slash = neomake#utils#Slash()
+  let subdir = tempdir . slash . 'project' . slash . 'sub'
+  call mkdir(subdir, 'p', 0700)
+
+  new
+  file project/sub/file_in_subdir
+  let bufnr = bufnr('%')
+
+  let maker = {'cwd': '%:p:h'}
+  function! maker.get_list_entries(...) abort dict
+    return [{
+      \ 'filename': 'file_in_subdir',
+      \ 'lnum': 23,
+      \ 'col': 42,
+      \ 'text': 'error message',
+      \ 'type': 'E',
+      \ }]
+  endfunction
+
+  " uses unlisted buffer if file does not exist
+  call neomake#Make(1, [maker])
+  NeomakeTestsWaitForFinishedJobs
+  AssertEqual getloclist(0), [{
+  \ 'lnum': 23,
+  \ 'bufnr': bufnr + 1,
+  \ 'col': 42,
+  \ 'valid': 1,
+  \ 'vcol': 0,
+  \ 'nr': -1,
+  \ 'type': 'E',
+  \ 'pattern': '',
+  \ 'text': 'error message'}]
+  let unlisted_bufnr = bufnr+1
+  AssertEqual bufname(unlisted_bufnr), 'file_in_subdir'
+  Assert !buflisted(unlisted_bufnr), 'buffer is unlisted (1)'
+
+  " uses unlisted buffer if file does not exist (cwd matches)
+  let orig_cwd = getcwd()
+  exe 'lcd' tempdir
+  call neomake#Make(1, [maker])
+  NeomakeTestsWaitForFinishedJobs
+
+  AssertEqual getloclist(0), [{
+  \ 'lnum': 23,
+  \ 'bufnr': bufnr + 1,
+  \ 'col': 42,
+  \ 'valid': 1,
+  \ 'vcol': 0,
+  \ 'nr': -1,
+  \ 'type': 'E',
+  \ 'pattern': '',
+  \ 'text': 'error message'}]
+  AssertEqual bufname(unlisted_bufnr), orig_cwd.'/file_in_subdir'
+  Assert !buflisted(unlisted_bufnr), 'buffer is unlisted (2)'
+
+  exe 'bwipe' unlisted_bufnr
+  bwipe
+
+Execute (get_list_entries: filename with cwd):
+  let tempdir = tempname()
+  let slash = neomake#utils#Slash()
+  let subdir = tempdir . slash . 'project' . slash . 'sub'
+  call mkdir(subdir, 'p', 0700)
+
+  let maker = {'cwd': '%:p:h'}
+  function! maker.get_list_entries(...) abort dict
+    return [{
+      \ 'filename': 'file_in_subdir',
+      \ 'lnum': 23,
+      \ 'col': 42,
+      \ 'text': 'error message',
+      \ 'type': 'E',
+      \ }]
+  endfunction
+
+  new
+  exe 'lcd' tempdir
+  write project/sub/file_in_subdir
+  AssertEqual expand('%:p'), tempdir.'/project/sub/file_in_subdir'
+  Assert filereadable('project/sub/file_in_subdir'), 'file is readable'
+
+"   AssertEqual bufname('%'), 'file_in_subdir'
+  call neomake#Make(1, [maker])
+  NeomakeTestsWaitForFinishedJobs
+
+  AssertEqual getloclist(0), [{
+  \ 'lnum': 23,
+  \ 'bufnr': bufnr('%'),
+  \ 'col': 42,
+  \ 'valid': 1,
+  \ 'vcol': 0,
+  \ 'nr': -1,
+  \ 'type': 'E',
+  \ 'pattern': '',
+  \ 'text': 'error message'}]
+
+  bwipe
 
 Execute (neomake#Make can be called with dict):
   call neomake#Make({})

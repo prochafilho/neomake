@@ -180,20 +180,12 @@ function! s:MakeJob(make_id, options) abort
         return {}
     endif
 
-    let cwd = get(jobinfo, 'cwd', s:make_info[a:make_id].cwd)
-    if !empty(cwd)
-        let old_wd = getcwd()
-        let cd = haslocaldir() ? 'lcd' : (exists(':tcd') == 2 && haslocaldir(-1, 0)) ? 'tcd' : 'cd'
-        try
-            exe cd fnameescape(cwd)
-        " Tests fail with E344, but in reality it is E472?!
-        " If uncaught, both are shown.  Let's just catch every error here.
-        catch
-            call neomake#utils#ErrorMessage(
-                        \ maker.name.": could not change to maker's cwd (".cwd.'): '
-                        \ .v:exception, jobinfo)
-            return {}
-        endtry
+    let [cd_error, cd_back_cmd] = s:cd_to_jobs_cwd(jobinfo)
+    if !empty(cd_error)
+        call neomake#utils#ErrorMessage(
+                    \ maker.name.": could not change to maker's cwd (".cd_back_cmd.'): '
+                    \ .cd_error, jobinfo)
+        return {}
     endif
 
     try
@@ -297,8 +289,8 @@ function! s:MakeJob(make_id, options) abort
             return {}
         endif
     finally
-        if exists('cd') && exists('old_wd')
-            exe cd fnameescape(old_wd)
+        if !empty(cd_back_cmd)
+            exe cd_back_cmd
         endif
         if exists('save_env_file')
             " Not possible to unlet environment vars
@@ -1022,6 +1014,27 @@ function! s:clean_for_new_make(jobinfo) abort
     let s:make_info[a:jobinfo.make_id].cleaned_for_make = 1
 endfunction
 
+function! s:cd_to_jobs_cwd(jobinfo) abort
+    let cwd = get(a:jobinfo, 'cwd', s:make_info[a:jobinfo.make_id].cwd)
+    if !empty(cwd)
+        let cwd = fnamemodify(cwd, ':p')
+        let cur_wd = getcwd()
+        if cwd !=? cur_wd
+            let cd = haslocaldir() ? 'lcd' : (exists(':tcd') == 2 && haslocaldir(-1, 0)) ? 'tcd' : 'cd'
+
+            try
+                exe cd.' '.fnameescape(cwd)
+            catch
+                " Tests fail with E344, but in reality it is E472?!
+                " If uncaught, both are shown.  Let's just catch every error here.
+                return [v:exception, cwd]
+            endtry
+            return ['', cd.' '.fnameescape(cur_wd)]
+        endif
+    endif
+    return ['', '']
+endfunction
+
 function! s:ProcessEntries(jobinfo, entries, ...) abort
     let file_mode = a:jobinfo.file_mode
 
@@ -1046,13 +1059,26 @@ function! s:ProcessEntries(jobinfo, entries, ...) abort
                     \ . '})')
 
         let prev_list = file_mode ? getloclist(0) : getqflist()
-        if file_mode
-            call setloclist(0, a:entries, 'a')
-            let parsed_entries = getloclist(0)[len(prev_list):]
-        else
-            call setqflist(a:entries, 'a')
-            let parsed_entries = getqflist()[len(prev_list):]
+
+        let [cd_error, cd_back_cmd] = s:cd_to_jobs_cwd(a:jobinfo)
+        if !empty(cd_error)
+            call neomake#utils#DebugMessage(printf(
+                        \ "Could not change to job's cwd (%s): %s",
+                        \ cd_back_cmd, v:exception), a:jobinfo)
         endif
+        try
+            if file_mode
+                call setloclist(0, a:entries, 'a')
+                let parsed_entries = getloclist(0)[len(prev_list):]
+            else
+                call setqflist(a:entries, 'a')
+                let parsed_entries = getqflist()[len(prev_list):]
+            endif
+        finally
+            if empty(cd_error)
+                exe cd_back_cmd
+            endif
+        endtry
         let idx = 0
         for e in parsed_entries
             if a:entries[idx].bufnr != e.bufnr
