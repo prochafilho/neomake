@@ -423,6 +423,7 @@ Execute (get_list_entries: filename with cwd (non-existing file)):
   \ 'pattern': '',
   \ 'text': 'error message'}]
   let unlisted_bufnr = bufnr+1
+  let bwipe_buffers = [unlisted_bufnr]
   AssertEqual bufname(unlisted_bufnr), 'file_in_subdir'
   Assert !buflisted(unlisted_bufnr), 'buffer is unlisted (1)'
 
@@ -432,9 +433,15 @@ Execute (get_list_entries: filename with cwd (non-existing file)):
   call neomake#Make(1, [maker])
   NeomakeTestsWaitForFinishedJobs
 
+  if has('patch-7.4.2017')
+    let expected_bufnr = unlisted_bufnr
+  else
+    let expected_bufnr = unlisted_bufnr + 1
+    let bwipe_buffers += [expected_bufnr]
+  endif
   AssertEqual getloclist(0), [{
   \ 'lnum': 23,
-  \ 'bufnr': bufnr + 1,
+  \ 'bufnr': expected_bufnr,
   \ 'col': 42,
   \ 'valid': 1,
   \ 'vcol': 0,
@@ -445,7 +452,9 @@ Execute (get_list_entries: filename with cwd (non-existing file)):
   AssertEqual bufname(unlisted_bufnr), orig_cwd.'/file_in_subdir'
   Assert !buflisted(unlisted_bufnr), 'buffer is unlisted (2)'
 
-  exe 'bwipe' unlisted_bufnr
+  for b in bwipe_buffers
+    exe 'bwipe' b
+  endfor
   bwipe
 
 Execute (get_list_entries: filename with cwd):
