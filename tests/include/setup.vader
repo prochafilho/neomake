@@ -316,13 +316,13 @@ Before:
   let g:sleep_efm_maker = {
       \ 'name': 'sleep_efm_maker',
       \ 'exe': 'sh',
-      \ 'args': ['-c', 'sleep 0.1; echo file_sleep_efm:1:E:error message; '
+      \ 'args': ['-c', 'sleep 0.01; echo file_sleep_efm:1:E:error message; '
       \         .'echo file_sleep_efm:2:W:warning; '
       \         .'echo file_sleep_efm:1:E:error2'],
       \ 'errorformat': '%f:%l:%t:%m',
       \ 'append_file': 0,
       \ }
-  let g:sleep_maker = NeomakeTestsCommandMaker('sleep-maker', 'sleep .1; echo slept')
+  let g:sleep_maker = NeomakeTestsCommandMaker('sleep-maker', 'sleep .01; echo slept')
   let g:error_maker = NeomakeTestsCommandMaker('error-maker', 'echo error; false')
   let g:success_maker = NeomakeTestsCommandMaker('success-maker', 'echo success')
   let g:doesnotexist_maker = {'exe': 'doesnotexist'}
