@@ -587,27 +587,3 @@ function! neomake#utils#fnamemodify(bufnr, modifier) abort
     endif
     return empty(path) ? '' : fnamemodify(path, a:modifier)
 endfunction
-
-function! neomake#utils#systemlist(cmd) abort
-    if empty(a:cmd)
-        return []
-    endif
-    if exists('*systemlist')
-        if has('nvim')
-            try
-                let r = systemlist(a:cmd)
-            catch /^Vim\%((\a\+)\)\=:E902/
-                return []
-            endtry
-            if r is# ''
-                " Neovim returns an empty string with `system('doesnotexist')`.
-                " https://github.com/neovim/neovim/issues/6626
-                return []
-            endif
-            Log r
-            return r
-        endif
-        return systemlist(join(map(a:cmd, 'neomake#utils#shellescape(v:val)')))
-    endif
-    return split(system(join(map(a:cmd, 'neomake#utils#shellescape(v:val)'))), '\n')
-endfunction
