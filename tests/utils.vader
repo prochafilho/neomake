@@ -476,8 +476,14 @@ Execute (neomake#utils#FindGlobFile):
 
 Execute (neomake#utils#systemlist):
   AssertEqual neomake#utils#systemlist([]), []
-  AssertEqual neomake#utils#systemlist(['echo 1']), ['1']
+  let r = neomake#utils#systemlist(['echo 1'])
+  if has('nvim')
+    AssertEqual r, []
+  else
+    AssertEqual r, ['/bin/bash: echo 1: command not found']
+  endif
   AssertEqual neomake#utils#systemlist(['echo', '1']), ['1']
-  AssertEqual neomake#utils#systemlist(['echo 1; echo  2']), ['1', '2']
+  AssertEqual neomake#utils#systemlist(['echo', '1']), ['1']
+  AssertEqual neomake#utils#systemlist(['sh', '-c', 'echo 1; echo  2']), ['1', '2']
   AssertEqual neomake#utils#systemlist(['echo', '1 2']), ['1 2']
-  AssertEqual neomake#utils#systemlist(['printf', '%s\\n', '1', '2']), ['1', '2']
+  AssertEqual neomake#utils#systemlist(['printf', '%s\n', '1', '2']), ['1', '2']

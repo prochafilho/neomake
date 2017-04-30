@@ -593,11 +593,21 @@ function! neomake#utils#systemlist(cmd) abort
         return []
     endif
     if exists('*systemlist')
-        let cmd = a:cmd
-        if !has('nvim')
-            let cmd = join(cmd)
+        if has('nvim')
+            try
+                let r = systemlist(a:cmd)
+            catch /^Vim\%((\a\+)\)\=:E902/
+                return []
+            endtry
+            if r is# ''
+                " Neovim returns an empty string with `system('doesnotexist')`.
+                " https://github.com/neovim/neovim/issues/6626
+                return []
+            endif
+            Log r
+            return r
         endif
-        return systemlist(cmd)
+        return systemlist(join(map(a:cmd, 'neomake#utils#shellescape(v:val)')))
     endif
-    return split(system(join(a:cmd)), "\n")
+    return split(system(join(map(a:cmd, 'neomake#utils#shellescape(v:val)'))), '\n')
 endfunction
