@@ -587,3 +587,17 @@ function! neomake#utils#fnamemodify(bufnr, modifier) abort
     endif
     return empty(path) ? '' : fnamemodify(path, a:modifier)
 endfunction
+
+function! neomake#utils#systemlist(cmd) abort
+    if empty(a:cmd)
+        return []
+    endif
+    if exists('*systemlist')
+        let cmd = a:cmd
+        if !has('nvim')
+            let cmd = join(cmd)
+        endif
+        return systemlist(cmd)
+    endif
+    return split(system(join(a:cmd)), "\n")
+endfunction

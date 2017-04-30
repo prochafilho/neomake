@@ -473,3 +473,11 @@ Execute (neomake#utils#FindGlobFile):
   AssertEqual neomake#utils#FindGlobFile('common-file'), file_in_tempdir
   AssertEqual neomake#utils#FindGlobFile('common-file', subdir), file_in_subdir
   bwipe
+
+Execute (neomake#utils#systemlist):
+  AssertEqual neomake#utils#systemlist([]), []
+  AssertEqual neomake#utils#systemlist(['echo 1']), ['1']
+  AssertEqual neomake#utils#systemlist(['echo', '1']), ['1']
+  AssertEqual neomake#utils#systemlist(['echo 1; echo  2']), ['1', '2']
+  AssertEqual neomake#utils#systemlist(['echo', '1 2']), ['1 2']
+  AssertEqual neomake#utils#systemlist(['printf', '%s\\n', '1', '2']), ['1', '2']
