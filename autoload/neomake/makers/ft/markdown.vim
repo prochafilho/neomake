@@ -3,7 +3,7 @@ function! neomake#makers#ft#markdown#SupersetOf() abort
 endfunction
 function! neomake#makers#ft#markdown#EnabledMakers() abort
     let makers = executable('mdl') ? ['mdl'] : ['markdownlint']
-    return makers + ['proselint', 'writegood'] + neomake#makers#ft#text#EnabledMakers()
+    return makers + ['mdv', 'proselint', 'writegood'] + neomake#makers#ft#text#EnabledMakers()
 endfunction
 
 function! neomake#makers#ft#markdown#mdl() abort
@@ -12,6 +12,14 @@ function! neomake#makers#ft#markdown#mdl() abort
                 \ '%f:%l: %m'
                 \ }
 endfunction
+
+function! neomake#makers#ft#markdown#mdv() abort
+    return {
+                \ 'errorformat':
+                \ '%f:%l: %m'
+                \ }
+endfunction
+
 
 function! neomake#makers#ft#markdown#markdownlint() abort
     return {
@@ -29,3 +37,4 @@ function! neomake#makers#ft#markdown#alex() abort
                 \ '%-G%.%#'
                 \ }
 endfunction
+
